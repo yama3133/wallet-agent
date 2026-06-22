@@ -26,17 +26,21 @@ def main() -> None:
     }
 
     if provider == "StripePrivy":
-        kwargs["stripePrivyConfig"] = {
-            "appId": env("PRIVY_APP_ID"),
-            "appSecret": env("PRIVY_APP_SECRET"),
-            "authorizationId": env("PRIVY_AUTHORIZATION_ID"),
-            "authorizationPrivateKey": env("PRIVY_AUTHORIZATION_PRIVATE_KEY"),
+        kwargs["providerConfigurationInput"] = {
+            "stripePrivyConfiguration": {
+                "appId": env("PRIVY_APP_ID"),
+                "appSecret": env("PRIVY_APP_SECRET"),
+                "authorizationId": env("PRIVY_AUTHORIZATION_ID"),
+                "authorizationPrivateKey": env("PRIVY_AUTHORIZATION_PRIVATE_KEY"),
+            }
         }
     elif provider == "CoinbaseCDP":
-        kwargs["coinbaseCdpConfig"] = {
-            "apiKeyId": env("CDP_API_KEY_ID"),
-            "apiKeySecret": env("CDP_API_KEY_SECRET"),
-            "walletSecret": env("CDP_WALLET_SECRET"),
+        kwargs["providerConfigurationInput"] = {
+            "coinbaseCdpConfiguration": {
+                "apiKeyId": env("CDP_API_KEY_ID"),
+                "apiKeySecret": env("CDP_API_KEY_SECRET"),
+                "walletSecret": env("CDP_WALLET_SECRET"),
+            }
         }
     else:
         raise RuntimeError(f"未対応のプロバイダ: {provider}")

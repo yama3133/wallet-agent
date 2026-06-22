@@ -188,12 +188,33 @@ wallet-agent/
 
 ## 8. 確認事項・未解決
 
-- [ ] StripePrivy か CoinbaseCDP、どちらでPoCを進めるか（**デフォルト: StripePrivy**）
-- [ ] x402 対応の本物のテストAPI先（Coinbase Bazaar に何があるか要調査）
+- [x] ~~StripePrivy か CoinbaseCDP、どちらでPoCを進めるか~~ → **StripePrivy で着手済（だが signer 問題に当たった）**
+- [x] ~~x402 対応の本物のテストAPI先~~ → docsのテスト用 `https://drvd12nxpcyd5.cloudfront.net/market-recap` が生存（base-sepolia 0.001 USDC）
+- [ ] **Privy のwalletと Authorization Key の紐付け方**（2026-06-23 ハマり中。AWSの CreatePaymentInstrument が wallet 作成時に Authorization Key を signer に登録していない様子）
 - [ ] AgentCore Runtime のローカル開発体験（`agentcore invoke --local` 的なものがあるか確認）
 - [ ] Vercel OIDC Federation の Runtime invoke 権限スコープ（最小）
 - [ ] デモ台本（30秒バージョン / 5分バージョン）
 - [ ] ウォレット入金UXを登壇でどう見せるか（事前入金 vs ライブ入金）
+
+## 11. PoCで得られた事実（API確認済）
+
+### IAM
+- ServiceRole（ResourceRetrievalRole）には **trust policy + inline policy 両方** を最初から仕込む必要がある（docsの「自動付与」はAWS が PutRolePolicy するためのベースが要る）
+- PoCではinline policyを「`bedrock-agentcore:* on *` + Secrets Manager」で広めに付けた（本番では payments-iam-roles の minimal 4role に分割）
+- PaymentManager の name は **`[a-zA-Z][a-zA-Z0-9]{0,47}` ハイフン不可**。trust policy の ArnLike も `walletagentpm*`（ハイフン抜き）に合わせる
+
+### API スキーマ（docsとの差分）
+- `CreatePaymentCredentialProvider`: `stripePrivyConfig` ではなく `providerConfigurationInput.stripePrivyConfiguration`
+- `CreatePaymentManager` の出力: `paymentManagerId` + `paymentManagerArn` 両方ある。**`Get*` は `paymentManagerId`** を使う（Arnは引数で受け付けない）
+- `CreatePaymentConnector`: 引数は `paymentManagerId / name / type / credentialProviderConfigurations[{stripePrivy: {credentialProviderArn}}]`
+- `CreatePaymentInstrument` の出力: `paymentInstrument` でラップされている。`embeddedCryptoWallet.redirectUrl` は **Privy 経由では返ってこない**（サーバー側でwallet生成）
+- `GetPaymentInstrument` / `GetPaymentSession` / `GetPaymentInstrumentBalance` には **userId が必須**
+- `GetPaymentInstrumentBalance`: chain は enum `[SOLANA_DEVNET, SOLANA, BASE_SEPOLIA, BASE, ETHEREUM]`、token は enum `[USDC]`
+
+### Privy の挙動
+- `CreatePaymentInstrument` で wallet を作ると、Privy 側で自動的に内部Userが生成され、その User が wallet owner になる
+- 私が作った Authorization Key はその wallet の signer には**ならない**（要追加調査・設定）
+- → ここを解決しないと ProcessPayment は通らない
 
 ## 9. リスクとフォールバック
 

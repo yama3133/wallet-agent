@@ -4,7 +4,19 @@
 
 ## ステータス
 
-Phase 1 PoC スクリプト準備完了（2026-06-23）。あとは外部クレデンシャル取得 → 実行。
+Phase 1 PoC、ProcessPayment直前まで疎通（2026-06-23）。
+
+| Step | 状況 |
+|---|---|
+| 0. ServiceRole（trust + inline policy） | ✓ |
+| 1. PaymentCredentialProvider（StripePrivy） | ✓ |
+| 2. PaymentManager + Connector（READY） | ✓ |
+| 3. PaymentInstrument（Embedded Wallet ACTIVE、20 USDC入金確認） | ✓ |
+| 4. ProcessPayment（x402で1000μUSDC支払い） | ✗ Privyのsigner不整合で AccessDeniedException |
+
+**詰まりポイント**: AWSの`CreatePaymentInstrument`が作ったPrivy wallet は内部生成Userがowner、私のAuthorization Key (`icv02b63ulgusmb11hxhahey`) はそのwalletの signer に紐付いていない。Privyダッシュボードでも `Signer for: 空` と確認。
+
+**次の方針**: Strands Agent本体の実装に進む。決済部分はモック・try/exceptで囲い、x402署名は後で詰める。
 
 - 設計: [DESIGN.md](./DESIGN.md)
 - 外部クレデンシャル取得手順: [agent/CREDENTIALS.md](./agent/CREDENTIALS.md)

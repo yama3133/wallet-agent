@@ -20,13 +20,16 @@ import urllib.error
 from _common import env, print_header, region, require_state, save_state
 
 
-def wait_instrument_active(dp, manager_arn: str, instrument_id: str) -> None:
+def wait_instrument_active(dp, manager_arn: str, connector_id: str, instrument_id: str, user_id: str) -> None:
     print("PaymentInstrument の status を確認")
     for _ in range(60):
-        inst = dp.get_payment_instrument(
-            paymentManagerArn=manager_arn, paymentInstrumentId=instrument_id
+        resp = dp.get_payment_instrument(
+            userId=user_id,
+            paymentManagerArn=manager_arn,
+            paymentConnectorId=connector_id,
+            paymentInstrumentId=instrument_id,
         )
-        st = inst["status"]
+        st = resp["paymentInstrument"]["status"]
         print(f"  status: {st}")
         if st == "ACTIVE":
             return
@@ -39,14 +42,14 @@ def wait_instrument_active(dp, manager_arn: str, instrument_id: str) -> None:
 def create_session(dp, manager_arn: str, user_id: str) -> str:
     max_usd = env("PAYMENT_SESSION_MAX_USD", "1.00")
     expiry_min = int(env("PAYMENT_SESSION_EXPIRY_MINUTES", "60"))
-    sess = dp.create_payment_session(
+    sess_resp = dp.create_payment_session(
         userId=user_id,
         paymentManagerArn=manager_arn,
         expiryTimeInMinutes=expiry_min,
         limits={"maxSpendAmount": {"value": str(max_usd), "currency": "USD"}},
         clientToken=str(uuid.uuid4()),
     )
-    sid = sess["paymentSessionId"]
+    sid = sess_resp["paymentSession"]["paymentSessionId"]
     print(f"PaymentSession: {sid}  (max ${max_usd} / {expiry_min}min)")
     return sid
 
@@ -77,6 +80,7 @@ def main() -> None:
     print_header("Step 4: PaymentSession 作成 + x402 決済")
 
     manager_arn = require_state("payment_manager_arn")
+    connector_id = require_state("payment_connector_id")
     instrument_id = require_state("payment_instrument_id")
     user_id = require_state("test_user_id")
     merchant = env("TEST_MERCHANT_URL")
@@ -87,7 +91,7 @@ def main() -> None:
         endpoint_url=f"https://bedrock-agentcore.{region()}.amazonaws.com",
     )
 
-    wait_instrument_active(dp, manager_arn, instrument_id)
+    wait_instrument_active(dp, manager_arn, connector_id, instrument_id, user_id)
     session_id = create_session(dp, manager_arn, user_id)
 
     print("\nマーチャントにリクエスト")
@@ -122,7 +126,7 @@ def main() -> None:
 
     print("\n--- セッション集計 ---")
     final = dp.get_payment_session(
-        paymentManagerArn=manager_arn, paymentSessionId=session_id
+        userId=user_id, paymentManagerArn=manager_arn, paymentSessionId=session_id
     )
     print(json.dumps(final, indent=2, default=str)[:800])
 

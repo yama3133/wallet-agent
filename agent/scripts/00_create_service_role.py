@@ -3,8 +3,9 @@
 このロールは bedrock-agentcore.amazonaws.com が AssumeRole してクレデンシャル取得する
 ためのサービスロール。PaymentManager 作成時に必要。
 
-ベース権限は CreatePaymentManager 時に AWS 側が自動で追加する。
-ここでは Trust policy だけ仕込む。
+Trust policy と base permission policy を仕込む。Connector 追加時の per-connector
+permission も AWS 側が自動で付与する設計のはずだが、PoC では確実に動かすため
+最低限の inline policy を手動で attach する。
 """
 from __future__ import annotations
 
@@ -16,7 +17,31 @@ from botocore.exceptions import ClientError
 from _common import print_header, region, save_state
 
 ROLE_NAME = "AgentCorePaymentsResourceRetrievalRole"
-PAYMENT_MANAGER_NAME_PREFIX = "wallet-agent-pm"
+PAYMENT_MANAGER_NAME_PREFIX = "walletagentpm"
+INLINE_POLICY_NAME = "WalletAgentPaymentsBase"
+
+
+def base_permission_policy(account_id: str, aws_region: str) -> dict:
+    # PoC では最低限の絞り込みで bedrock-agentcore 系を全許可、Secrets Manager は account 内に限定。
+    # 本番では payments-iam-roles docs の最小権限版に差し替える。
+    return {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "BedrockAgentCoreAll",
+                "Effect": "Allow",
+                "Action": ["bedrock-agentcore:*"],
+                "Resource": "*",
+            },
+            {
+                "Sid": "SecretsManagerAccess",
+                "Effect": "Allow",
+                "Action": ["secretsmanager:GetSecretValue"],
+                "Resource": [f"arn:aws:secretsmanager:{aws_region}:{account_id}:secret:*"],
+                "Condition": {"StringEquals": {"aws:ResourceAccount": account_id}},
+            },
+        ],
+    }
 
 
 def trust_policy(account_id: str, aws_region: str) -> dict:
@@ -32,7 +57,7 @@ def trust_policy(account_id: str, aws_region: str) -> dict:
                     "ArnLike": {
                         "aws:SourceArn": (
                             f"arn:aws:bedrock-agentcore:{aws_region}:{account_id}"
-                            f":payment-manager/{PAYMENT_MANAGER_NAME_PREFIX}-*"
+                            f":payment-manager/{PAYMENT_MANAGER_NAME_PREFIX}*"
                         )
                     },
                 },
@@ -73,6 +98,14 @@ def main() -> None:
         )
         role_arn = iam.get_role(RoleName=ROLE_NAME)["Role"]["Arn"]
         print(f"更新済み: {role_arn}")
+
+    perm_doc = base_permission_policy(account_id, aws_region)
+    iam.put_role_policy(
+        RoleName=ROLE_NAME,
+        PolicyName=INLINE_POLICY_NAME,
+        PolicyDocument=json.dumps(perm_doc),
+    )
+    print(f"インラインポリシー {INLINE_POLICY_NAME} を attach")
 
     save_state(
         {

@@ -28,7 +28,7 @@ def main() -> None:
         endpoint_url=f"https://bedrock-agentcore.{region()}.amazonaws.com",
     )
 
-    inst = dp.create_payment_instrument(
+    inst_resp = dp.create_payment_instrument(
         userId=user_id,
         paymentManagerArn=manager_arn,
         paymentConnectorId=connector_id,
@@ -41,17 +41,33 @@ def main() -> None:
         },
         clientToken=str(uuid.uuid4()),
     )
+    inst = inst_resp["paymentInstrument"]
     instrument_id = inst["paymentInstrumentId"]
-    redirect_url = inst.get("paymentInstrumentDetails", {}).get("redirectUrl")
-    print(f"InstrumentId: {instrument_id}")
-    print(f"\n=== 手動ステップ ===")
-    print("以下のURLをブラウザで開き、ウォレットを入金してエージェントに署名権限を付与:")
-    print(f"  {redirect_url}")
-    print("テスト用なら base-sepolia の USDC を faucet から入手して入金")
+    details = inst.get("paymentInstrumentDetails", {}).get("embeddedCryptoWallet", {})
+    wallet_address = details.get("walletAddress")
+    redirect_url = details.get("redirectUrl")
+    status = inst.get("status")
+
+    print(f"InstrumentId   : {instrument_id}")
+    print(f"WalletAddress  : {wallet_address}")
+    print(f"Status         : {status}")
+    if redirect_url:
+        print(f"\n=== 手動ステップ ===")
+        print("ブラウザで以下を開き、ウォレットを入金して署名権限を付与:")
+        print(f"  {redirect_url}")
+    else:
+        print(
+            "\nStripePrivy 経由のためサーバー側でウォレットが生成された。"
+            "redirectUrl はなく、署名権限は Authorization Key で付与済み。"
+        )
+    print("テスト用：base-sepolia の USDC を faucet から walletAddress 宛に送る")
+    print("  - Circle: https://faucet.circle.com/  (USDC, base-sepolia 選択)")
+    print("  - Coinbase: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet  (ETH for gas)")
 
     save_state(
         {
             "payment_instrument_id": instrument_id,
+            "wallet_address": wallet_address,
             "payment_instrument_redirect_url": redirect_url,
             "test_user_id": user_id,
         }
