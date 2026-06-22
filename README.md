@@ -12,11 +12,11 @@ Phase 1 PoC、ProcessPayment直前まで疎通（2026-06-23）。
 | 1. PaymentCredentialProvider（StripePrivy） | ✓ |
 | 2. PaymentManager + Connector（READY） | ✓ |
 | 3. PaymentInstrument（Embedded Wallet ACTIVE、20 USDC入金確認） | ✓ |
-| 4. ProcessPayment（x402で1000μUSDC支払い） | ✗ Privyのsigner不整合で AccessDeniedException |
+| 4. ProcessPayment（x402で1000μUSDC支払い） | ✅ 署名フル通過、最後はbase-sepoliaのgas(ETH)不足のみ |
 
-**詰まりポイント**: AWSの`CreatePaymentInstrument`が作ったPrivy wallet は内部生成Userがowner、私のAuthorization Key (`icv02b63ulgusmb11hxhahey`) はそのwalletの signer に紐付いていない。Privyダッシュボードでも `Signer for: 空` と確認。
+**解決経緯**: 当初は Privyのwallet signer が紐付かず AccessDeniedException。privy-io/aws-agentcore-sdk テンプレを `~/wallet-agent-privy-template` にclone → `pnpm dev` → ブラウザでログイン → 「Connect agent」UI で Authorization Key を wallet の additional signer として登録 → AgentCore の generate_payment_header が `PAYMENT-SIGNATURE` を生成 → マーチャント (drvd12nxpcyd5.cloudfront.net) が受理 → transaction simulation 段階まで進行（`invalid_exact_evm_transaction_simulation_failed`）。base-sepolia の ETH faucet で gas を補えば完走の見込み。
 
-**次の方針**: Strands Agent本体の実装に進む。決済部分はモック・try/exceptで囲い、x402署名は後で詰める。
+**Phase 1 PoC 実証完了範囲**: AgentCore Payments を介した x402 マイクロペイメントの**署名・提示まで全パス通過**。残るは blockchain上の gas のみ。
 
 - 設計: [DESIGN.md](./DESIGN.md)
 - 外部クレデンシャル取得手順: [agent/CREDENTIALS.md](./agent/CREDENTIALS.md)
@@ -58,7 +58,8 @@ wallet-agent/
 - [x] Phase 1: AgentCore Payments PoC スクリプト作成
 - [x] Phase 1: PoC を実機で疎通（Privyアカウント取得・base-sepolia 20 USDC受領まで）
 - [x] Phase 1: Strands Agent + 承認ゲート（骨格）
-- [ ] Phase 1: ProcessPayment の Privy signer 問題を解決
+- [x] Phase 1: ProcessPayment の Privy signer 問題を解決（Privy templateの Connect agent UI 経由）
+- [x] Phase 1: AgentCore Payments のフル署名パス通過確認
 - [ ] Phase 1: DynamoDB + AgentCore Runtime デプロイ
 - [ ] Phase 1: Vercel フロント（承認カード + SSE）
 - [ ] Phase 1: 登壇デモ整備

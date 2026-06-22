@@ -58,7 +58,7 @@ def fetch_402(url: str) -> dict:
     """マーチャントを叩いて 402 のペイロードを取得。200 ならその場で終了。"""
     print(f"GET {url}")
     try:
-        with urllib.request.urlopen(url, timeout=20) as r:
+        with urllib.request.urlopen(url, timeout=90) as r:
             body = r.read().decode()
             print(f"  200 OK ({len(body)} bytes) - 課金なしで取れた")
             return {"statusCode": r.status, "headers": dict(r.headers), "body": body}
@@ -116,7 +116,7 @@ def main() -> None:
     print("\nリトライ")
     req = urllib.request.Request(merchant, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=90) as r:
             body = r.read().decode()
             print(f"  {r.status} ({len(body)} bytes)")
             print(f"  body 先頭: {body[:300]}")
