@@ -93,6 +93,9 @@ def request_payment_approval(
         f"  python agent.py reject  {entry['approval_id']}\n"
         f"=================\n"
     )
+    if os.environ.get("WALLET_AGENT_AUTO_APPROVE") == "1":
+        print("AUTO_APPROVE: APPROVED として進める")
+        return approvals.decide(entry["approval_id"], "APPROVED", reason="auto-approved (demo mode)")
     final = approvals.wait_for_decision(entry["approval_id"])
     return final
 
@@ -218,9 +221,15 @@ SYSTEM_PROMPT = """\
 
 
 def build_agent() -> Agent:
+    from strands.models import BedrockModel
+
     region = os.environ.get("AWS_REGION", "us-east-1")
+    model = BedrockModel(
+        model_id="us.anthropic.claude-sonnet-4-6",
+        region_name=region,
+    )
     return Agent(
-        model="us.anthropic.claude-sonnet-4-6-20250928-v1:0",
+        model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=[search_paid_resources, request_payment_approval, execute_x402_payment],
     )
@@ -244,6 +253,18 @@ def cli() -> None:
     if args and args[0] == "pending":
         for entry in approvals.list_pending():
             print(json.dumps(entry, indent=2, default=str, ensure_ascii=False))
+        return
+
+    if args and args[0] == "run":
+        # 単発実行モード: python agent.py run "<prompt>"
+        prompt = " ".join(args[1:]) if len(args) > 1 else ""
+        if not prompt:
+            print("usage: python agent.py run \"<prompt>\"")
+            sys.exit(1)
+        print(f"あなた> {prompt}\n")
+        agent = build_agent()
+        result = agent(prompt)
+        print(f"\nエージェント> {result}")
         return
 
     print("wallet-agent: 対話モード。Ctrl-D で終了。")
