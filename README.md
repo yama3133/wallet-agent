@@ -56,8 +56,9 @@ wallet-agent/
 ## 開発予定
 
 - [x] Phase 1: AgentCore Payments PoC スクリプト作成
-- [ ] Phase 1: PoC を実機で疎通（要 Privy or Coinbase アカウント + ウォレット入金）
-- [ ] Phase 1: Strands Agent + 承認ゲート
+- [x] Phase 1: PoC を実機で疎通（Privyアカウント取得・base-sepolia 20 USDC受領まで）
+- [x] Phase 1: Strands Agent + 承認ゲート（骨格）
+- [ ] Phase 1: ProcessPayment の Privy signer 問題を解決
 - [ ] Phase 1: DynamoDB + AgentCore Runtime デプロイ
 - [ ] Phase 1: Vercel フロント（承認カード + SSE）
 - [ ] Phase 1: 登壇デモ整備
@@ -90,3 +91,30 @@ python 04_run_payment.py
 ```
 
 各ステップの作成物 ARN/ID は `agent/state.json` に追記される。
+
+## Strands Agent CLI
+
+```bash
+cd agent
+source .venv/bin/activate
+
+# 対話モード
+python agent.py
+> 市況サマリが欲しい、上限 0.005 ドルで
+
+# 別ターミナルで承認待ち一覧
+python agent.py pending
+
+# 承認 / 拒否
+python agent.py approve <approval_id>
+python agent.py reject  <approval_id>
+```
+
+承認状態は `agent/.approvals.json` に保存（gitignore済）。
+
+## ウォレット残高確認
+
+```bash
+cd agent/scripts
+../.venv/bin/python balance.py
+```

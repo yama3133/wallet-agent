@@ -17,6 +17,7 @@ venv/
 *.secret
 *.pem
 agent/state.json
+agent/.approvals.json
 
 .DS_Store
 .idea/
