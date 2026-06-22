@@ -32,6 +32,7 @@ sys.path.insert(0, str(HERE / "scripts"))  # _common を読みたい
 load_dotenv(HERE / ".env")
 
 from tools import approvals, x402_resources  # noqa: E402
+from tools import rakuten, stripe_checkout  # noqa: E402
 
 LOG = logging.getLogger("wallet-agent")
 logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
@@ -208,16 +209,107 @@ def execute_x402_payment(resource_id: str, payment_session_id: str | None = None
 # ----------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
-あなたはユーザーの代わりに有料の情報 API にアクセスする買い物エージェントです。
+あなたはユーザーの代わりに買い物・情報購入を代行するエージェントです。
 
-ルール:
-- ユーザーの依頼に対し、search_paid_resources で適切なリソースを探す
-- 支払いが必要な場合、必ず request_payment_approval を呼んで人間に承認を求める
-- 承認結果が APPROVED でないなら、決済しない。代わりに、なぜ実行できないかをユーザーに伝える
-- APPROVED なら execute_x402_payment を呼んで本文を取得し、内容を要約してユーザーに返す
-- 1依頼につき承認は最大1回。APPROVED のあとに追加の支払いが要るなら、別途承認を取り直す
-- すべての応答は日本語で簡潔に。
+依頼を見て、用途に応じて以下のどちらかのフローを選ぶ:
+
+【A. 有料 API / x402 リソース（Phase 1）】
+- search_paid_resources でカタログから候補を探す
+- request_payment_approval で人間承認を必ず取る
+- APPROVED なら execute_x402_payment で AgentCore Payments の x402 マイクロペイメントを実行し、内容を要約
+
+【B. 楽天市場の実商品（Phase 2）】
+- search_rakuten_items で候補を 3〜5 件探す
+- request_purchase_approval で人間承認を必ず取る
+- APPROVED なら execute_stripe_checkout で Stripe テストモードの Checkout URL を生成し、ユーザーに渡す
+
+共通ルール:
+- 承認結果が APPROVED でないなら、決済しない。なぜ実行できないかを日本語で説明する
+- 1依頼につき承認は最大1回。追加の支払いが要るなら、別途承認を取り直す
+- 価格や URL は捏造しない。検索ツールの結果だけを根拠にする
+- 応答はすべて日本語、簡潔に
 """
+
+
+@tool
+def search_rakuten_items(keyword: str, max_jpy: int | None = None, hits: int = 5) -> list[dict]:
+    """楽天市場の商品を検索する（Phase 2）。
+
+    Args:
+        keyword: 検索ワード（例 "黒い靴下"）。
+        max_jpy: 最大価格（円）。None なら無制限。
+        hits: 何件返すか（最大30、デフォルト5）。
+
+    Returns:
+        items: id / title / price (JPY) / url / image / shop / reviewAverage。
+    """
+    try:
+        return rakuten.search(keyword, max_price=max_jpy, hits=min(hits, 30))
+    except Exception as e:
+        return [{"error": str(e)}]
+
+
+@tool
+def request_purchase_approval(
+    item_id: str,
+    title: str,
+    amount_jpy: int,
+    justification: str,
+) -> dict:
+    """楽天商品の購入承認をユーザーに求める（Phase 2）。
+
+    Args:
+        item_id: search_rakuten_items で得た id (itemCode)。
+        title: 商品名。
+        amount_jpy: 価格（円）。
+        justification: なぜこの商品を選んだか短く。
+
+    Returns:
+        decision フィールド付き承認結果。
+    """
+    entry = approvals.request_approval(
+        resource=f"rakuten:{item_id}",
+        amount_usd=f"{amount_jpy}JPY",
+        justification=f"[楽天] {title}: {justification}",
+    )
+    print(
+        f"\n=== 楽天購入の承認カード ===\n"
+        f"approval_id: {entry['approval_id']}\n"
+        f"商品: {title}\n"
+        f"価格: ¥{amount_jpy}\n"
+        f"理由: {justification}\n"
+        f"================\n"
+    )
+    if os.environ.get("WALLET_AGENT_AUTO_APPROVE") == "1":
+        return approvals.decide(entry["approval_id"], "APPROVED", reason="auto-approved")
+    return approvals.wait_for_decision(entry["approval_id"])
+
+
+@tool
+def execute_stripe_checkout(item_id: str, title: str, amount_jpy: int, image_url: str = "") -> dict:
+    """承認済みの楽天商品で Stripe Checkout Session を作る（Phase 2）。
+
+    Args:
+        item_id: 楽天 itemCode。
+        title: 商品名。
+        amount_jpy: 価格（円）。
+        image_url: 商品画像URL（あれば）。
+
+    Returns:
+        Checkout URL。ユーザーがブラウザで開いて test card で決済する。
+    """
+    base = os.environ.get("WALLET_AGENT_PUBLIC_URL", "http://localhost:3002")
+    try:
+        sess = stripe_checkout.create_checkout(
+            title=title,
+            amount_jpy=int(amount_jpy),
+            success_url=f"{base}/checkout/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/checkout/cancel",
+            image_url=image_url or None,
+        )
+        return {"status": "READY", **sess, "item_id": item_id}
+    except Exception as e:
+        return {"status": "ERROR", "error": str(e), "item_id": item_id}
 
 
 def build_agent() -> Agent:
@@ -231,8 +323,38 @@ def build_agent() -> Agent:
     return Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[search_paid_resources, request_payment_approval, execute_x402_payment],
+        tools=[
+            search_paid_resources,
+            request_payment_approval,
+            execute_x402_payment,
+            search_rakuten_items,
+            request_purchase_approval,
+            execute_stripe_checkout,
+        ],
     )
+
+
+# ----------------------------------------------------------------------
+# AgentCore Runtime entrypoint
+# ----------------------------------------------------------------------
+# AgentCore Runtime にデプロイされた場合は HTTP リクエストで invoke される。
+# payload には {"prompt": "..."} のような JSON が来る想定。
+try:
+    from bedrock_agentcore.runtime import BedrockAgentCoreApp
+
+    app = BedrockAgentCoreApp()
+
+    @app.entrypoint
+    def invoke(payload: dict) -> dict:
+        prompt = (payload or {}).get("prompt", "")
+        if not prompt:
+            return {"error": "missing 'prompt' in payload"}
+        agent = build_agent()
+        result = agent(prompt)
+        return {"response": str(result)}
+except Exception:
+    # ローカル CLI 実行時は runtime SDK が無くてもOK
+    app = None
 
 
 # ----------------------------------------------------------------------
@@ -290,4 +412,11 @@ def cli() -> None:
 
 
 if __name__ == "__main__":
-    cli()
+    # AgentCore Runtime 用に `python agent.py serve` で HTTP サーバ起動
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        if app is None:
+            print("BedrockAgentCoreApp が import 出来ない。bedrock-agentcore パッケージを確認")
+            sys.exit(1)
+        app.run()
+    else:
+        cli()
