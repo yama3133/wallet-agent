@@ -4,7 +4,11 @@
 
 ## ステータス
 
-設計中（DESIGN.md 参照）。コードはまだ書いていない。
+Phase 1 PoC スクリプト準備完了（2026-06-23）。あとは外部クレデンシャル取得 → 実行。
+
+- 設計: [DESIGN.md](./DESIGN.md)
+- 外部クレデンシャル取得手順: [agent/CREDENTIALS.md](./agent/CREDENTIALS.md)
+- PoCスクリプト: [agent/scripts/](./agent/scripts/)
 
 ## アーキテクチャ（要約）
 
@@ -39,9 +43,38 @@ wallet-agent/
 
 ## 開発予定
 
-1. Phase 1: AgentCore Payments PoC（boto3 で疎通）
-2. Phase 1: Strands Agent + 承認ゲート
-3. Phase 1: DynamoDB + AgentCore Runtime デプロイ
-4. Phase 1: Vercel フロント（承認カード + SSE）
-5. Phase 1: 登壇デモ整備
-6. Phase 2: 楽天 + Stripe
+- [x] Phase 1: AgentCore Payments PoC スクリプト作成
+- [ ] Phase 1: PoC を実機で疎通（要 Privy or Coinbase アカウント + ウォレット入金）
+- [ ] Phase 1: Strands Agent + 承認ゲート
+- [ ] Phase 1: DynamoDB + AgentCore Runtime デプロイ
+- [ ] Phase 1: Vercel フロント（承認カード + SSE）
+- [ ] Phase 1: 登壇デモ整備
+- [ ] Phase 2: 楽天 + Stripe
+
+## PoCの動かし方
+
+```bash
+# 1. クレデンシャル取得（Privy or Coinbase）→ agent/CREDENTIALS.md 参照
+# 2. AWS にログイン
+aws login
+
+# 3. venv とパッケージ
+cd agent
+python3.13 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 4. .env を埋める
+cp .env.example .env
+# エディタで Privy/Coinbase の認証情報を貼る
+
+# 5. スクリプトを順番に
+cd scripts
+python 00_create_service_role.py
+python 01_create_credential_provider.py
+python 02_create_payment_manager.py
+python 03_create_instrument.py   # redirect URL でウォレット入金
+python 04_run_payment.py
+```
+
+各ステップの作成物 ARN/ID は `agent/state.json` に追記される。
