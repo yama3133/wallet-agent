@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  IAM Role for Vercel OIDC Federation to access wallet-agent DynamoDB tables
+  and (optionally) AgentCore Runtime invocation.
+
+Parameters:
+  VercelOidcProviderArn:
+    Type: String
+    Default: arn:aws:iam::761018866498:oidc-provider/oidc.vercel.com/yuuki-yamashitas-projects
+    Description: 既存のVercel OIDC Provider ARN（事前作成済みなので参照のみ）
+  RoleName:
+    Type: String
+    Default: wallet-agent-vercel-role
+  TablePrefix:
+    Type: String
+    Default: wallet_agent
+
+Resources:
+  VercelRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref RoleName
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref VercelOidcProviderArn
+            Action: "sts:AssumeRoleWithWebIdentity"
+            Condition:
+              StringEquals:
+                "oidc.vercel.com/yuuki-yamashitas-projects:aud": "https://vercel.com/yuuki-yamashitas-projects"
+
+  DynamoPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: wallet-agent-vercel-ddb
+      Roles:
+        - !Ref VercelRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TablesRW
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:DescribeTable
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_tasks"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_tasks/index/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_approvals"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_approvals/index/*"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_txns"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}_txns/index/*"
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt VercelRole.Arn
+  OidcProviderArn:
+    Value: !Ref VercelOidcProviderArn

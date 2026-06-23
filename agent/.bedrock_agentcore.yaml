@@ -1,0 +1,62 @@
+default_agent: walletagent
+agents:
+  walletagent:
+    name: walletagent
+    language: python
+    node_version: '20'
+    entrypoint: agent.py
+    deployment_type: container
+    runtime_type: null
+    platform: linux/arm64
+    container_runtime: none
+    source_path: /Users/yuukiyamashita/wallet-agent/agent
+    aws:
+      execution_role: arn:aws:iam::761018866498:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-281cbcae0f
+      execution_role_auto_create: false
+      account: '761018866498'
+      region: us-east-1
+      ecr_repository: 761018866498.dkr.ecr.us-east-1.amazonaws.com/walletagent
+      ecr_auto_create: false
+      s3_path: null
+      s3_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+        network_mode_config: null
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+      lifecycle_configuration:
+        idle_runtime_session_timeout: null
+        max_lifetime: null
+    bedrock_agentcore:
+      agent_id: walletagent-PlfUffBC8B
+      agent_arn: arn:aws:bedrock-agentcore:us-east-1:761018866498:runtime/walletagent-PlfUffBC8B
+      agent_session_id: adc4aab2-16c2-455d-944a-5d2f634e8507
+    codebuild:
+      project_name: bedrock-agentcore-walletagent-builder
+      execution_role: arn:aws:iam::761018866498:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-281cbcae0f
+      source_bucket: bedrock-agentcore-codebuild-sources-761018866498-us-east-1
+    memory:
+      mode: STM_ONLY
+      memory_id: walletagent_mem-aSaKKV4CBJ
+      memory_arn: arn:aws:bedrock-agentcore:us-east-1:761018866498:memory/walletagent_mem-aSaKKV4CBJ
+      memory_name: walletagent_mem
+      event_expiry_days: 30
+      first_invoke_memory_check_done: true
+      was_created_by_toolkit: false
+    identity:
+      credential_providers: []
+      workload: null
+    aws_jwt:
+      enabled: false
+      audiences: []
+      signing_algorithm: ES384
+      issuer_url: null
+      duration_seconds: 300
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
+    api_key_env_var_name: null
+    api_key_credential_provider_name: null
+    is_generated_by_agentcore_create: false
