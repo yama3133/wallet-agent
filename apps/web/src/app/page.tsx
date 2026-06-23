@@ -32,11 +32,19 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6">
       <div className="max-w-3xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold mb-1">wallet-agent</h1>
-          <p className="text-sm text-zinc-500">
-            AI に財布を渡す日 — 承認カード操作 UI
-          </p>
+        <header className="mb-8 flex items-baseline justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-1">wallet-agent</h1>
+            <p className="text-sm text-zinc-500">
+              AI に財布を渡す日 — 承認カード操作 UI
+            </p>
+          </div>
+          <a
+            href="/chat"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            chat →
+          </a>
         </header>
 
         {error && (
