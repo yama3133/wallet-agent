@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { Approval } from "@/lib/types";
 import ApprovalCard from "@/components/ApprovalCard";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useI18n } from "@/lib/i18n-context";
 
 export default function Home() {
+  const { t } = useI18n();
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -32,19 +35,20 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-6">
       <div className="max-w-3xl mx-auto">
-        <header className="mb-8 flex items-baseline justify-between">
+        <header className="mb-8 flex items-baseline justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-bold mb-1">wallet-agent</h1>
-            <p className="text-sm text-zinc-500">
-              AI に財布を渡す日 — 承認カード操作 UI
-            </p>
+            <p className="text-sm text-zinc-500">{t.appSubtitle}</p>
           </div>
-          <a
-            href="/chat"
-            className="text-sm text-blue-600 hover:underline"
-          >
-            chat →
-          </a>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <a
+              href="/chat"
+              className="text-sm text-blue-600 hover:underline whitespace-nowrap"
+            >
+              {t.navChat}
+            </a>
+          </div>
         </header>
 
         {error && (
@@ -53,16 +57,20 @@ export default function Home() {
           </div>
         )}
 
-        <h2 className="text-lg font-semibold mb-3">承認待ち</h2>
+        <h2 className="text-lg font-semibold mb-3">{t.approvalsTitle}</h2>
 
         {loading ? (
-          <div className="text-zinc-500">読み込み中...</div>
+          <div className="text-zinc-500">{t.loadingFetch}</div>
         ) : approvals.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center text-zinc-500">
-            現在、承認待ちはありません。
+            {t.approvalsEmpty}
             <br />
             <span className="text-xs">
-              CLI で <code className="bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">python agent.py</code> を起動して依頼すると、ここに承認カードが並びます。
+              {t.approvalsEmptyHint1}
+              <code className="bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">
+                python agent.py
+              </code>
+              {t.approvalsEmptyHint2}
             </span>
           </div>
         ) : (
