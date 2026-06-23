@@ -33,16 +33,6 @@ Phase 1 PoC、ProcessPayment直前まで疎通（2026-06-23）。
 
 詳細は [DESIGN.md](./DESIGN.md) を参照。
 
-## なぜ作るか
-
-memory 上の以下の登壇/CFPで「AIに財布を渡す日」という同じ軸を使う。共通の実装ベースとして必要。
-
-- re:Invent 2026 COM Track（本命③）
-- Qiita Tech Festa Day 2026
-- iOSDC Japan 2026 LT5
-- re:Deploy 2026 Security
-- Aegis（Slack Agent Builder Challenge）
-
 ## 構成
 
 ```
@@ -52,18 +42,6 @@ wallet-agent/
 ├── agent/         AgentCore Runtime（Strands Agent）
 └── infra/         DynamoDB / IAM
 ```
-
-## 開発予定
-
-- [x] Phase 1: AgentCore Payments PoC スクリプト作成
-- [x] Phase 1: PoC を実機で疎通（Privyアカウント取得・base-sepolia 20 USDC受領まで）
-- [x] Phase 1: Strands Agent + 承認ゲート（骨格）
-- [x] Phase 1: ProcessPayment の Privy signer 問題を解決（Privy templateの Connect agent UI 経由）
-- [x] Phase 1: AgentCore Payments のフル署名パス通過確認
-- [ ] Phase 1: DynamoDB + AgentCore Runtime デプロイ
-- [ ] Phase 1: Vercel フロント（承認カード + SSE）
-- [ ] Phase 1: 登壇デモ整備
-- [ ] Phase 2: 楽天 + Stripe
 
 ## PoCの動かし方
 
